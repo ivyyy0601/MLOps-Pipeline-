@@ -1,0 +1,59 @@
+stages: ##只要这些文件有变动（比如 raw 数据更新，或者脚本修改），DVC 就会认为这个 stage 需要重新运行。
+  data_ingestion:
+    cmd: python src/data/data_ingestion.py
+    deps:
+    - src/data/data_ingestion.py
+    params:
+    - data_ingestion.test_size
+    outs:
+    - data/raw   #写好后运行dvc repro，然后就有raw数据了
+
+  data_preprocessing:  
+    cmd: python src/data/data_preprocessing.py
+    deps:
+    - data/raw/train.csv
+    - data/raw/test.csv
+    - src/data/data_preprocessing.py
+    outs:
+    - data/interim  #写好后运行dvc repro 然后就有interim数据了
+
+  model_building:
+    cmd: python src/model/model_building.py
+    deps:
+    - data/interim/train_processed.csv
+    - src/model/model_building.py
+    params:
+    - model_building.max_features
+    - model_building.ngram_range
+    - model_building.learning_rate
+    - model_building.max_depth
+    - model_building.n_estimators
+    outs:
+    - lgbm_model.pkl  #保存了 训练好的 LightGBM 模型（包括树结构、参数等   负责 分类预测。
+    - tfidf_vectorizer.pkl #保存了 TF-IDF 向量化器  负责 特征提取
+    #写好后运行dvc repro，然后就有lgbm_model.pkl和tfidf_vectorizer.pkl了
+
+  model_evaluation:
+    cmd: python src/model/model_evaluation.py
+    deps:
+    - lgbm_model.pkl #保存了 训练好的 LightGBM 模型（包括树结构、参数等   负责 分类预测。
+    - tfidf_vectorizer.pkl #保存了 TF-IDF 向量化器  负责 特征提取
+    - data/interim/train_processed.csv #保存了 预处理后的训练数据
+    - data/interim/test_processed.csv   #保存了 预处理后的测试数据
+    - src/model/model_evaluation.py #保存了 模型评估脚本
+    outs:
+    - experiment_info.json #保存了 模型评估信息 将来你只要有这个 JSON，就能很快知道该去哪里加载模型，而不用重新训练。
+    #写好后运行dvc repro，然后就有experiment_info.json了
+    #experiment_info.json = 记录“实验产出”的模型信息（本地或 S3 的路径）。
+
+#前者是“我跑过的实验”，后者是“我认可并登记的模型”。
+
+  model_registration:
+      cmd: python src/model/register_model.py #注册模型
+      deps:
+      - experiment_info.json #保存了 模型评估信息 将来你只要有这个 JSON，就能很快知道该去哪里加载模型，而不用重新训练。
+      - src/model/register_model.py #保存了 模型注册脚本
+      outs:
+      - model_registration.json #保存了 模型注册信息
+      #写好后运行dvc repro，然后就有model_registration.json了
+      #model_registration.json = 记录“生产模型”的信息（MLflow Registry 里的名字 + 版本）。
