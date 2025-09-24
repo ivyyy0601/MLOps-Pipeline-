@@ -41,10 +41,7 @@ This project demonstrates how to go from **raw data → production-ready model �
 Data → Preprocessing/EDA → Model Training (Baseline + Advanced)
     → MLflow Tracking & Registry → DVC Reproducible Pipeline
     → Flask API + Chrome Extension → Docker + GitHub Actions + AWS Deployment
-
-
-
-
+```
 
 ---
 
