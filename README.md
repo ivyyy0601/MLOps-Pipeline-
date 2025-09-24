@@ -1,7 +1,46 @@
 # 🎬 MLOps-Pipeline: YouTube Sentiment Analysis
 
-End-to-end **YouTube comment sentiment analysis MLOps** project:  
-Data → Preprocessing/EDA → Baseline Model → MLflow (AWS) → DVC Reproducible Pipeline → Model Registry → Flask API → Chrome Extension → Docker & GitHub Actions CI/CD.
+End-to-end **MLOps pipeline** for YouTube comment sentiment analysis.  
+This project demonstrates how to go from **raw data → production-ready model → deployment & monitoring** with modern MLOps tools.
+
+---
+
+## 🚀 Project Overview
+- **Goal**: Build a scalable, reproducible pipeline for **YouTube comment sentiment analysis**.  
+- **Scope**: Covers **data collection, preprocessing, modeling, experiment tracking, reproducibility, deployment, and CI/CD**.  
+- **Tech Stack**: Python, Scikit-learn, LightGBM, MLflow, DVC, AWS (EC2/S3/ECR), Flask, Chrome Extension, Docker, GitHub Actions.
+
+---
+
+## 🔑 Key Features
+- 📊 **Data & EDA**: Text preprocessing, feature engineering, exploratory analysis  
+- 🤖 **Modeling**: Baseline → tuned models (LogReg, XGBoost, LightGBM, stacking)  
+- 📈 **Experiment Tracking**: MLflow (runs on AWS S3 + EC2)  
+- 🔄 **Reproducibility**: DVC pipeline for versioned data + model stages  
+- 🏷 **Model Registry**: Promote best models with MLflow Model Registry  
+- 🌐 **Deployment**: Flask REST API + Chrome extension frontend  
+- ⚙️ **CI/CD**: Dockerized workflow, GitHub Actions, AWS EC2 + ECR hosting
+
+---
+
+## 📂 Pipeline Steps
+1. **Data Collection** – APIs / CSV ingestion  
+2. **Preprocessing & EDA** – cleaning, tokenization, TF-IDF/BoW, class balance analysis  
+3. **Baseline Model** – TF-IDF + Logistic Regression / Random Forest  
+4. **MLflow Tracking on AWS** – store experiments in S3, run MLflow server on EC2  
+5. **Model Improvement** – handle imbalance, tune hyperparameters, stacking ensemble  
+6. **Reproducible Workflow with DVC** – define data → preprocess → train → evaluate stages  
+7. **Model Registry** – push best models to MLflow Registry for version control  
+8. **API + Frontend** – Flask backend, Chrome extension visualization (pie charts/word clouds)  
+9. **CI/CD** – Docker, GitHub Actions, AWS EC2/ECR for automated build & deploy  
+
+---
+
+## 📊 High-Level Architecture
+```text
+Data → Preprocessing/EDA → Model Training (Baseline + Advanced)
+    → MLflow Tracking & Registry → DVC Reproducible Pipeline
+    → Flask API + Chrome Extension → Docker + GitHub Actions + AWS Deployment
 
 ---
 
