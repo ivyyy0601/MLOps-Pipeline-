@@ -13,7 +13,7 @@ dvc repro   # first run triggers data_ingestion
 
 ---
 
-## 2️⃣ Data Preprocessing & EDA
+## 2️⃣ Data Preprocessing & EDA [use the reddit data first]
 - **Cleaning & Processing**: handle missing/duplicate values, regex cleaning, lowercasing  
 - **Stopwords & Text**: custom stopword list, keep negation/transition words, lemmatization  
 - **Features**: BoW/TF‑IDF, control n‑gram and max_features  
@@ -28,13 +28,6 @@ dvc repro   # first run triggers data_ingestion
 
 ## 3️⃣ Baseline Model
 First make it work with a simple baseline: **TF‑IDF + Logistic Regression / Random Forest**. Use metrics as a reference for later improvements.
-```bash
-dvc repro   # triggers model_building & model_evaluation
-```
-**Artifacts**
-- `lgbm_model.pkl`  
-- `tfidf_vectorizer.pkl`  
-- `experiment_info.json`
 
 > Steps 1–3 were validated in `notebooks/1_Preprocessing_&_EDA.ipynb`.
 
@@ -45,8 +38,11 @@ dvc repro   # triggers model_building & model_evaluation
 
 **Components**
 - **IAM User** (e.g., `ml_server`) with S3 access  
+![image.png](%E4%BD%BF%E7%94%A8%20Python%E3%80%81AWS%E3%80%81Docker%20%E7%9A%84%20MLOps%20%E7%AE%A1%E9%81%93%20%E2%80%93%20YouTube%20%E8%A7%82%E4%BC%97%E6%83%85%E7%BB%AA%20276307fdbf47807e8e4ac3141fa0821c/image%202.png)
 - **S3 Bucket** (e.g., `mlbucket922`) to store MLflow **artifacts** (models/logs/files)  
+![image.png](%E4%BD%BF%E7%94%A8%20Python%E3%80%81AWS%E3%80%81Docker%20%E7%9A%84%20MLOps%20%E7%AE%A1%E9%81%93%20%E2%80%93%20YouTube%20%E8%A7%82%E4%BC%97%E6%83%85%E7%BB%AA%20276307fdbf47807e8e4ac3141fa0821c/image%204.png)
 - **EC2 Instance** (e.g., `ml-machine`) to run the **MLflow server**
+![image.png](%E4%BD%BF%E7%94%A8%20Python%E3%80%81AWS%E3%80%81Docker%20%E7%9A%84%20MLOps%20%E7%AE%A1%E9%81%93%20%E2%80%93%20YouTube%20%E8%A7%82%E4%BC%97%E6%83%85%E7%BB%AA%20276307fdbf47807e8e4ac3141fa0821c/image%205.png)
 
 ### ⚙️ AWS Setup Details (in order)
 **1) Connect to EC2**
@@ -77,6 +73,7 @@ mlflow server \
 - Add **inbound port 5000** in the EC2 **Security Group**  
 - Open: `http://<EC2-Public-DNS>:5000/`  
   (example: `http://ec2-xx-xxx-xxx-xx.compute-1.amazonaws.com:5000/` — use your own)
+![image.png](%E4%BD%BF%E7%94%A8%20Python%E3%80%81AWS%E3%80%81Docker%20%E7%9A%84%20MLOps%20%E7%AE%A1%E9%81%93%20%E2%80%93%20YouTube%20%E8%A7%82%E4%BC%97%E6%83%85%E7%BB%AA%20276307fdbf47807e8e4ac3141fa0821c/image%209.png)
 
 > The four steps above mirror the internal doc sequence. Follow them to bring MLflow online.
 
@@ -99,135 +96,141 @@ In NLP, a typical baseline is **BoW/TF‑IDF + LogReg/SVM/Naive Bayes**. Improve
 - LightGBM + HPT: `7_experiment_6_lightgbm_detailed_hpt.ipynb`  
 - Stacking: `8_stacking.ipynb`
 
+code in `notebooks/`.
+
 > All experiments are tracked in **MLflow**.
 
 ---
 
 ## 6️⃣ Make It Reproducible with DVC
 `dvc.yaml` splits the pipeline into **4+1** stages (the last one is registration):
-- **data_ingestion** → read/split raw data (controlled by `data_ingestion.test_size`)
-- **data_preprocessing** → cleaning + vectorization (controlled by `ngram_range / max_features / vectorizer`)
-- **model_building** → training (controlled by LightGBM/XGBoost/LogReg params, etc.)
-- **model_evaluation** → unified evaluation, outputs `experiment_info.json`
-- **model_registration** → (see next) write into MLflow Model Registry
+- **data_ingestion** → read/split raw data (controlled by `data_ingestion.test_size`)  → output: data/raw 
+- **data_preprocessing** → cleaning + vectorization (controlled by `ngram_range / max_features / vectorizer`)  → output: data/interim 
+- **model_building** → training (controlled by LightGBM/XGBoost/LogReg params, etc.)→ output: data/interim
+- **Model Evaluation:** `src/model/model_evaluation.py`  
+  Logs **Accuracy, F1, Classification Report, Confusion Matrix** to **MLflow**--->output:lgbm_model.pkl  #save trained LightGBM model and TF-IDF
 
-**Commands**
+**Run**
 ```bash
-dvc repro          # reproduce the whole pipeline
-dvc exp run        # run an experiment with parameter changes
-dvc params diff    # show parameter differences
+conda create -n youtube python=3.11 -y
+conda activate youtube
+pip install -r requirements.txt
+
+dvc init
+dvc repro
 ```
+
 
 ---
 
-## 7️⃣ Register the Model (MLflow Model Registry)
-**Goal**: Register the **approved best model** into MLflow Registry with a canonical name & versioning for easy deployment/rollback.
+## 7️⃣ Register the Model (MLflow Model Registry)  Add Model to Model Registry (MLflow)
+**Purpose**: Store the best-performing model into the **MLflow Model Registry**, generating model versions (v1/v2/…), enabling easier deployment and rollback. 
 
 **Script & Dependencies**
 - `src/model/register_model.py`  
 - **Input**: `experiment_info.json` (tells the script where to load the best artifacts)  
-- **Output**: `model_registration.json` (records model name & version)
-
-**Run**
-```bash
-python src/model/register_model.py
-# or trigger via the model_registration stage in dvc.yaml
-```
-**Result**: In MLflow, you’ll see versions (e.g., `yt_chrome_plugin_model` v1/v2/…).
+- **Output**: `yt_chrome_plugin_model` ( records best model.）
+![image.png](%E4%BD%BF%E7%94%A8%20Python%E3%80%81AWS%E3%80%81Docker%20%E7%9A%84%20MLOps%20%E7%AE%A1%E9%81%93%20%E2%80%93%20YouTube%20%E8%A7%82%E4%BC%97%E6%83%85%E7%BB%AA%20276307fdbf47807e8e4ac3141fa0821c/image%2029.png)
+ 
 
 ---
 
-## 8️⃣ Serving with Flask API
-**Location**: `flask_api/app.py`  
-**Highlights**: CORS enabled; supports loading from **MLflow Model Registry** (or fallback to local `pkl`).
+# 8️⃣ Implement Chrome Plugin + Flask API
 
-**Key Endpoints**
-- **POST /predict**  
-  Request: `{"comments": ["text1", "text2", ...]}`  
-  Response: `[{"comment": "...", "sentiment": 1|0|-1}, ...]`
-- **POST /predict_with_timestamps**  
-  Request: `{"comments":[{"text":"...","timestamp":"01:23"}, ...]}`  
-  Response: predictions with timestamps for video overlay/markers
-- **POST /generate_chart**  
-  Request: `{"sentiment_counts":{"1":10,"0":5,"-1":2}}`  
-  Response: pie chart PNG (Matplotlib)
-- **POST /generate_wordcloud**  
-  Request: `{"comments":["...","..."]}`  
-  Response: word cloud PNG (WordCloud)
+### Flask API (`flask_api/app.py`)
+- Uses `matplotlib.use('Agg')` → supports rendering without GUI.  
+- **Core Endpoints**:
+  - `POST /predict`: input `{"comments":[...]}` → returns sentiment predictions  
+  - `POST /predict_with_timestamps`: predictions with `timestamp` included  
+  - `POST /generate_chart`: input `sentiment_counts` → returns pie chart PNG  
+  - `POST /generate_wordcloud`: input `comments` → returns word cloud PNG  
 
-**Run locally**
+### Model Loading
+1. **Preferred**: Load dynamically from MLflow Registry  
+   ```python
+   mlflow.pyfunc.load_model("models:/<name>/<ver>")
+   ```
+2. **Fallback**: Load from local `.pkl` file (template already in code comments).
+
+> ⚡ The project already includes complete **preprocessing + vectorization alignment** logic to ensure the input DataFrame schema matches training.
+
+### Run Locally
 ```bash
-python flask_api/app.py  # default 0.0.0.0:5000
+python flask_api/app.py  # default http://0.0.0.0:5000
 ```
 
-**Example (cURL)**
-```bash
-curl -X POST http://localhost:5000/predict   -H "Content-Type: application/json"   -d '{"comments":["this is great","not good at all"]}'
-```
+### Chrome Plugin (`yt-chrome-plugin-frontend/`)
+1. Open Chrome → go to `chrome://extensions/`  
+2. Enable **Developer Mode**  
+3. Click **Load unpacked** → select `yt-chrome-plugin-frontend/`  
+4. The extension will call the Flask API and display predictions as labels, ratios, and visualizations (pie chart/word cloud).
+[image.png](%E4%BD%BF%E7%94%A8%20Python%E3%80%81AWS%E3%80%81Docker%20%E7%9A%84%20MLOps%20%E7%AE%A1%E9%81%93%20%E2%80%93%20YouTube%20%E8%A7%82%E4%BC%97%E6%83%85%E7%BB%AA%20276307fdbf47807e8e4ac3141fa0821c/image%2031.png)
+
+### Development & Debugging
+- Use **Postman** to test API endpoints.  
+![image.png](%E4%BD%BF%E7%94%A8%20Python%E3%80%81AWS%E3%80%81Docker%20%E7%9A%84%20MLOps%20%E7%AE%A1%E9%81%93%20%E2%80%93%20YouTube%20%E8%A7%82%E4%BC%97%E6%83%85%E7%BB%AA%20276307fdbf47807e8e4ac3141fa0821c/image%2030.png)
+- For **real YouTube data** → request a **YouTube Data API Key** from Google Cloud.  
+  ⚠️ Do **NOT** commit real API Keys to the repo (sample key in docs is placeholder only).
+
+----view my favorite vloger
+![image.png](%E4%BD%BF%E7%94%A8%20Python%E3%80%81AWS%E3%80%81Docker%20%E7%9A%84%20MLOps%20%E7%AE%A1%E9%81%93%20%E2%80%93%20YouTube%20%E8%A7%82%E4%BC%97%E6%83%85%E7%BB%AA%20276307fdbf47807e8e4ac3141fa0821c/image%2034.png)
 
 ---
 
-## 9️⃣ Frontend: Chrome Extension (`yt-chrome-plugin-frontend/`)
-**Suggested Structure**
-```
-yt-chrome-plugin-frontend/
-├─ manifest.json
-├─ popup.html
-├─ popup.js
-├─ background.js         # optional: long-running tasks / context menus
-└─ icons/                # 16/48/128 px
-```
-
-**Workflow**
-1. `popup.js` reads comments from the page or via **YouTube Data API** (configure API key, or fetch via backend).  
-2. POST the comment array to Flask `/predict` or `/predict_with_timestamps`.  
-3. Render sentiment labels and ratios; optionally fetch `/generate_chart` and `/generate_wordcloud` images and display.
-
-**Load for development**
-- Open `chrome://extensions/` → enable **Developer mode** → **Load unpacked** → select `yt-chrome-plugin-frontend/`  
-- In the extension settings, set **API Base URL** (e.g., `http://<your-domain-or-ec2>:5000`)
-
-**Security tip**: Store your API key in `chrome.storage` or the backend; **don’t hardcode it in Git**.
-
 ---
 
-## 🔟 Dockerization & Deployment (ECR + EC2)
-**Build image**
-```bash
-docker build -t mlops-pipeline:latest .
+# 9️⃣ CI/CD (Docker + GitHub Actions + AWS)
+
+Goal: Automate build → push to **ECR** → pull & run on **EC2**.
+
+### Workflow
+1. **Build** docker image  
+2. **Push** to ECR  
+3. **Launch** EC2  
+4. EC2 **pulls** image  
+5. EC2 **runs** container  
+
+Required AWS Policies:
+- `AmazonEC2ContainerRegistryFullAccess`  
+- `AmazonEC2FullAccess`  
+
+### Example ECR Repository URI
 ```
-
-**Run (locally or on EC2)**
-```bash
-docker run -d -p 8080:5000   -e MLFLOW_TRACKING_URI="http://<mlflow-ec2>:5000"   --name yt-sentiment mlops-pipeline:latest
-```
-
-**Push to ECR (example)**
-```bash
-aws ecr get-login-password --region us-east-1 |   docker login --username AWS --password-stdin <acct>.dkr.ecr.us-east-1.amazonaws.com
-
-docker tag mlops-pipeline:latest <acct>.dkr.ecr.us-east-1.amazonaws.com/mlops-pipeline:latest
-docker push <acct>.dkr.ecr.us-east-1.amazonaws.com/mlops-pipeline:latest
+294892597101.dkr.ecr.us-east-1.amazonaws.com/mlops-pipeline
 ```
 
 ---
 
-## 1️⃣1️⃣ GitHub Actions: CI/CD (with Self-Hosted Runner)
-**Required Secrets**
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_REGION` (e.g., `us-east-1`)
-- `AWS_ECR_LOGIN_URI` (e.g., `<acct>.dkr.ecr.us-east-1.amazonaws.com`)
-- `ECR_REPOSITORY_NAME` (e.g., `mlops-pipeline`)
+### Self-hosted Runner & Secrets
 
-**Recommended Stages**
-- **CI**: Checkout → Lint → Unit tests  
-- **CD (build & push to ECR)**: Login ECR → Build → Push  
-- **Deploy (on self-hosted runner/EC2)**: Pull → `docker run -d -p 8080:5000 ...`
+![image.png](%E4%BD%BF%E7%94%A8%20Python%E3%80%81AWS%E3%80%81Docker%20%E7%9A%84%20MLOps%20%E7%AE%A1%E9%81%93%20%E2%80%93%20YouTube%20%E8%A7%82%E4%BC%97%E6%83%85%E7%BB%AA%20276307fdbf47807e8e4ac3141fa0821c/image%2035.png)
+
+#### Install Docker on EC2
+```bash
+sudo apt-get update -y
+sudo apt-get upgrade -y
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker ubuntu
+newgrp docker
+```
+
+#### Configure EC2 as Self-hosted Runner
+Go to GitHub → `Settings → Actions → Runners` and follow the setup guide.
+
+![image.png](%E4%BD%BF%E7%94%A8%20Python%E3%80%81AWS%E3%80%81Docker%20%E7%9A%84%20MLOps%20%E7%AE%A1%E9%81%93%20%E2%80%93%20YouTube%20%E8%A7%82%E4%BC%97%E6%83%85%E7%BB%AA%20276307fdbf47807e8e4ac3141fa0821c/image%2039.png)
 
 ---
 
-### Notes
-- For macOS + LightGBM/OpenMP errors: `brew install libomp` and export `DYLD_LIBRARY_PATH` accordingly.  
-- Keep secrets out of the repo; never commit real API keys or credentials.  
-- `experiment_info.json` links training/evaluation outputs; `model_registration.json` records the production model name/version.
+### Configure GitHub Secrets
+In repo **Settings → Secrets and variables → Actions**, add:
+
+- `AWS_ACCESS_KEY_ID`  
+- `AWS_SECRET_ACCESS_KEY`  
+- `AWS_REGION` (e.g., `us-east-1`)  
+- `AWS_ECR_LOGIN_URI` (e.g., `294892597101.dkr.ecr.us-east-1.amazonaws.com`)  
+- `ECR_REPOSITORY_NAME` (e.g., `mlops-pipeline`)  
+
+
+![image.png](%E4%BD%BF%E7%94%A8%20Python%E3%80%81AWS%E3%80%81Docker%20%E7%9A%84%20MLOps%20%E7%AE%A1%E9%81%93%20%E2%80%93%20YouTube%20%E8%A7%82%E4%BC%97%E6%83%85%E7%BB%AA%20276307fdbf47807e8e4ac3141fa0821c/image%2040.png)
+---
